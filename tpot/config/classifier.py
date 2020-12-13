@@ -183,6 +183,12 @@ classifier_config_dict = {
         'threshold': [10]
     },
 
+    'tpot.builtins.ColumnTransformer': {
+        'transformer': {},   
+        'cols': [[0, 1, 2], [0, 1, 6, 3]],
+        'remainder': ['drop', 'passthrough'],
+    },
+
     # Selectors
     'sklearn.feature_selection.SelectFwe': {
         'alpha': np.arange(0, 0.05, 0.001),

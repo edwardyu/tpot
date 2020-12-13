@@ -216,6 +216,8 @@ def TPOTOperatorClassFactory(opsourse, opdict, BaseClass=Operator, ArgBaseClass=
         arg_types = []
 
         for pname in sorted(opdict.keys()):
+            dep_op_list[pname] = []
+            dep_op_type[pname] = []
             prange = opdict[pname]
             if not isinstance(prange, dict):
                 classname = '{}__{}'.format(op_str, pname)
@@ -227,8 +229,8 @@ def TPOTOperatorClassFactory(opsourse, opdict, BaseClass=Operator, ArgBaseClass=
                         import_hash[dep_import_str].append(dep_op_str)
                     else:
                         import_hash[dep_import_str] = [dep_op_str]
-                    dep_op_list[pname] = dep_op_str
-                    dep_op_type[pname] = dep_op_obj
+                    dep_op_list[pname].append(dep_op_str)
+                    dep_op_type[pname].append(dep_op_obj)
                     if dval:
                         for dpname in sorted(dval.keys()):
                             dprange = dval[dpname]
@@ -276,11 +278,13 @@ def TPOTOperatorClassFactory(opsourse, opdict, BaseClass=Operator, ArgBaseClass=
 
             """
             op_arguments = []
-
+            valid_anames = [x.__name__.split('__')[1] for x in arg_types]
             if dep_op_list:
                 dep_op_arguments = {}
-                for dep_op_str in dep_op_list.values():
-                    dep_op_arguments[dep_op_str] = []
+                for dep_ops in dep_op_list.values():
+                    for dep_op_str in dep_ops:
+                        if dep_op_str in valid_anames:
+                            dep_op_arguments[dep_op_str] = []
 
             for arg_class, arg_value in zip(arg_types, args):
                 aname_split = arg_class.__name__.split('__')
@@ -297,19 +301,26 @@ def TPOTOperatorClassFactory(opsourse, opdict, BaseClass=Operator, ArgBaseClass=
             if dep_op_list:
                 # To make sure the inital operators is the first parameter just
                 # for better persentation
-                for dep_op_pname, dep_op_str in dep_op_list.items():
-                    arg_value = dep_op_str # a callable function, e.g scoring function
-                    doptype = dep_op_type[dep_op_pname]
-                    if inspect.isclass(doptype): # a estimator
-                        if issubclass(doptype, BaseEstimator) or \
-                            is_classifier(doptype) or \
-                            is_regressor(doptype) or \
-                            _is_transformer(doptype) or \
-                            issubclass(doptype, Kernel):
-                            arg_value = "{}({})".format(dep_op_str, ", ".join(dep_op_arguments[dep_op_str]))
-                    tmp_op_args.append("{}={}".format(dep_op_pname, arg_value))
+                for dep_op_pname, dep_ops in dep_op_list.items():
+                    for dep_op_str in dep_ops:
+                        arg_value = dep_op_str # a callable function, e.g scoring function
+                        # will never have mixed types
+                        doptype = dep_op_type[dep_op_pname][0]
+                        if inspect.isclass(doptype): # a estimator
+                            if  issubclass(doptype, BaseEstimator) or \
+                                is_classifier(doptype) or \
+                                is_regressor(doptype) or \
+                                _is_transformer(doptype) or \
+                                issubclass(doptype, Kernel):
+                                if dep_op_str in valid_anames:
+                                    arg_value = "{}({})".format(dep_op_str, ", ".join(dep_op_arguments[dep_op_str]))
+                                else:
+                                    arg_value = None
+                        if arg_value is not None:
+                            tmp_op_args.append("{}={}".format(dep_op_pname, arg_value))
             op_arguments = tmp_op_args + op_arguments
-            return "{}({})".format(op_obj.__name__, ", ".join(op_arguments))
+            r = "{}({})".format(op_obj.__name__, ", ".join(op_arguments))
+            return r
 
         class_profile['export'] = export
 

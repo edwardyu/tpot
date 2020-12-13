@@ -23,15 +23,25 @@ License along with TPOT. If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from .zero_count import ZeroCount
-from .combine_dfs import CombineDFs
-from .stacking_estimator import StackingEstimator
-from .one_hot_encoder import OneHotEncoder, auto_select_categorical_features, _transform_selected
-from .feature_transformers import CategoricalSelector, ContinuousSelector
-from .feature_set_selector import FeatureSetSelector
-from .column_transformer import ColumnTransformer
-try:
-    from .nn import PytorchLRClassifier, PytorchMLPClassifier
-except (ModuleNotFoundError, ImportError):
-    import warnings
-    warnings.warn("Warning: optional dependency `torch` is not available. - skipping import of NN models.")
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import make_column_transformer
+from sklearn.utils import check_array
+
+
+class ColumnTransformer(BaseEstimator, TransformerMixin):
+    """Wrapper around sklearn.compose.ColumnTransformer"""
+    def __init__(self, transformer, cols, remainder):
+        self.transformer = transformer
+        self.cols = cols
+        self.remainder = remainder
+
+    def fit(self, X, y=None):
+        valid_cols = [n for n in cols if n < X.shape[1]]
+        self.col_transformer = make_column_transformer((self.transformer, valid_cols), remainder=self.remainder)
+        self.col_transformer.fit(X, y)
+        return self
+
+    def transform(self, X):
+        return self.col_transformer.transform(X)
+

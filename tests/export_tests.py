@@ -337,6 +337,7 @@ exported_pipeline = make_pipeline(
 exported_pipeline.fit(training_features, training_target)
 results = exported_pipeline.predict(testing_features)
 """
+    print(export_pipeline(pipeline, tpot_obj.operators, tpot_obj._pset))
     assert expected_code == export_pipeline(pipeline, tpot_obj.operators, tpot_obj._pset)
 
 
@@ -535,6 +536,7 @@ def test_operator_export_2():
     export_string = TPOTSelectFromModel.export('gini', 0.10, 100, 0.10)
     expected_string = ("SelectFromModel(estimator=ExtraTreesClassifier(criterion=\"gini\","
         " max_features=0.1, n_estimators=100), threshold=0.1)")
+    print('TEST OPERATOR EXPORT 2')
     print(export_string)
     assert export_string == expected_string
 

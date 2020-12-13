@@ -35,6 +35,7 @@ from multiprocessing import cpu_count
 import os
 import re
 import errno
+from itertools import chain, combinations
 
 from tempfile import mkdtemp
 from shutil import rmtree
@@ -80,6 +81,14 @@ from .gp_deap import eaMuPlusLambda, mutNodeReplacement, _wrapped_cross_val_scor
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from tqdm.autonotebook import tqdm
+
+
+def powerset(n):
+    """
+    Will yield a generator [[0], [0, 1], [0, 1, n]...]
+    """
+    s = list(range(n))
+    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
 
 class TPOTBase(BaseEstimator):
@@ -275,6 +284,7 @@ class TPOTBase(BaseEstimator):
         self.disable_update_check = disable_update_check
         self.random_state = random_state
         self.log_file = log_file
+        self.shape = (0, 0)
 
 
     def _setup_template(self, template):
@@ -371,6 +381,21 @@ class TPOTBase(BaseEstimator):
         else:
             self._config_dict = self.default_config_dict
 
+        # setup ColumnTransformer config if necessary
+        if 'tpot.builtins.ColumnTransformer' not in self._config_dict:
+            return
+        for k, v in self._config_dict.items():
+            if k == 'tpot.builtins.ColumnTransformer':
+                continue
+            if TPOTOperatorClassFactory(k, v)[0].type() != "Transformer":
+                continue
+            self._config_dict['tpot.builtins.ColumnTransformer']['transformer'][k] = v
+            # subsample
+            subsample = .8
+            n_combinations = 100
+            n_cols = self.shape[1]
+            # self._config_dict['tpot.builtins.ColumnTransformer']['cols'] = [np.random.choice(n_cols, int(subsample*n_cols)) for i in range(n_combinations)]
+        print(self._config_dict)
 
     def _read_config_file(self, config_path):
         if os.path.isfile(config_path):
@@ -655,6 +680,7 @@ class TPOTBase(BaseEstimator):
             Returns a copy of the fitted TPOT object
 
         """
+        self.shape = features.shape
         self._fit_init()
         features, target = self._check_dataset(features, target, sample_weight)
 
@@ -825,7 +851,10 @@ class TPOTBase(BaseEstimator):
                 eval_ind_list = list(self.evaluated_individuals_.keys())
                 for pipeline, pipeline_scores in zip(self._pareto_front.items, reversed(self._pareto_front.keys)):
                     if np.isinf(pipeline_scores.wvalues[1]):
+                        # print('PIPELINE')
+                        # print(pipeline)
                         sklearn_pipeline = self._toolbox.compile(expr=pipeline)
+                        # print(sklearn_pipeline)
                         from sklearn.model_selection import cross_val_score
                         cv_scores = cross_val_score(sklearn_pipeline,
                                                     self.pretest_X,
